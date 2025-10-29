@@ -56,6 +56,7 @@ fn render_vector(
 #[cfg(feature = "raster-images")]
 mod raster_images {
     use crate::OptionLog;
+    use std::io::Cursor;
     use usvg::ImageRendering;
 
     fn decode_raster(image: &usvg::ImageKind) -> Option<tiny_skia::Pixmap> {
@@ -84,23 +85,16 @@ mod raster_images {
         use zune_jpeg::zune_core::colorspace::ColorSpace;
         use zune_jpeg::zune_core::options::DecoderOptions;
 
+        let cursor = Cursor::new(data);
         let options = DecoderOptions::default().jpeg_set_out_colorspace(ColorSpace::RGBA);
-        let mut decoder = zune_jpeg::JpegDecoder::new_with_options(data, options);
+        let mut decoder = zune_jpeg::JpegDecoder::new_with_options(cursor, options);
         decoder.decode_headers().ok()?;
-        let output_cs = decoder.get_output_colorspace()?;
+        let output_cs = decoder.output_colorspace()?;
 
         let img_data = {
             let data = decoder.decode().ok()?;
             match output_cs {
                 ColorSpace::RGBA => data,
-                // `set_output_color_space` is not guaranteed to actually always set the output space
-                // to RGBA (its docs say "we do not guarantee the decoder can convert to all colorspaces").
-                // In particular, it seems like it doesn't work for luma JPEGs,
-                // so we convert them manually.
-                ColorSpace::Luma => data
-                    .into_iter()
-                    .flat_map(|p| [p, p, p, 255])
-                    .collect::<Vec<_>>(),
                 _ => return None,
             }
         };

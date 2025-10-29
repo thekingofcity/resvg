@@ -8,7 +8,7 @@ This changelog also contains important changes in dependencies.
 
 ## [Unreleased]
 
-This release has an MSRV of 1.82.0 for `usvg` and 1.67.1 for `resvg` and the C API.
+This release has an MSRV of 1.82.0 for `usvg` and `resvg` and the C API.
 
 ### Added
 
@@ -1288,7 +1288,6 @@ This release has an MSRV of 1.65 for `usvg` and 1.67.1 for `resvg` and the C API
 [@michabay05]: https://github.com/michabay05
 [@Shnatsel]: https://github.com/Shnatsel
 [@JosefKuchar]: https://github.com/JosefKuchar
-[@HaHa421]: https://github.com/HaHa421
 
 [#897]: https://github.com/linebender/resvg/pull/897
 
