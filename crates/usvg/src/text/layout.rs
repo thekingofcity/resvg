@@ -907,6 +907,7 @@ fn process_chunk(
 
         let tmp_glyphs = shape_text(
             &chunk.text,
+            &span.font,
             font,
             span.small_caps,
             span.apply_kerning,
@@ -1292,6 +1293,7 @@ impl DatabaseExt for Database {
 /// Text shaping with font fallback.
 pub(crate) fn shape_text(
     text: &str,
+    font_node: &crate::Font,
     font: Arc<ResolvedFont>,
     small_caps: bool,
     apply_kerning: bool,
@@ -1327,9 +1329,56 @@ pub(crate) fn shape_text(
         }
 
         if let Some(c) = missing {
-            let fallback_font = match (resolver.select_fallback)(c, &used_fonts, fontdb)
-                .and_then(|id| fontdb.load_font(id))
-            {
+            let mut fallback_id = None;
+
+            let stretch = match font_node.stretch {
+                crate::FontStretch::UltraCondensed => fontdb::Stretch::UltraCondensed,
+                crate::FontStretch::ExtraCondensed => fontdb::Stretch::ExtraCondensed,
+                crate::FontStretch::Condensed => fontdb::Stretch::Condensed,
+                crate::FontStretch::SemiCondensed => fontdb::Stretch::SemiCondensed,
+                crate::FontStretch::Normal => fontdb::Stretch::Normal,
+                crate::FontStretch::SemiExpanded => fontdb::Stretch::SemiExpanded,
+                crate::FontStretch::Expanded => fontdb::Stretch::Expanded,
+                crate::FontStretch::ExtraExpanded => fontdb::Stretch::ExtraExpanded,
+                crate::FontStretch::UltraExpanded => fontdb::Stretch::UltraExpanded,
+            };
+
+            let style = match font_node.style {
+                crate::FontStyle::Normal => fontdb::Style::Normal,
+                crate::FontStyle::Italic => fontdb::Style::Italic,
+                crate::FontStyle::Oblique => fontdb::Style::Oblique,
+            };
+
+            for family in &font_node.families {
+                let fontdb_family = match family {
+                    crate::FontFamily::Serif => fontdb::Family::Serif,
+                    crate::FontFamily::SansSerif => fontdb::Family::SansSerif,
+                    crate::FontFamily::Cursive => fontdb::Family::Cursive,
+                    crate::FontFamily::Fantasy => fontdb::Family::Fantasy,
+                    crate::FontFamily::Monospace => fontdb::Family::Monospace,
+                    crate::FontFamily::Named(s) => fontdb::Family::Name(s),
+                };
+
+                let query = fontdb::Query {
+                    families: &[fontdb_family],
+                    weight: fontdb::Weight(font_node.weight),
+                    stretch,
+                    style,
+                };
+
+                if let Some(id) = fontdb.query(&query) {
+                    if !used_fonts.contains(&id) && fontdb.has_char(id, c) {
+                        fallback_id = Some(id);
+                        break;
+                    }
+                }
+            }
+
+            let fallback_id = fallback_id.or_else(|| {
+                (resolver.select_fallback)(c, &used_fonts, fontdb)
+            });
+
+            let fallback_font = match fallback_id.and_then(|id| fontdb.load_font(id)) {
                 Some(v) => Arc::new(v),
                 None => break 'outer,
             };
